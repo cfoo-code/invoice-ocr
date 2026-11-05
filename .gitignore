@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+env/
+
+# Testing & caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Runtime SQLite databases (re-generated deterministically by src/db.py)
+*.db
+*.db-journal
+*.db-wal
+data/invoices/*.png
+data/invoices/*.jpg
+
+# Environment variables
+.env
+.env.*
+!.env.example

@@ -1,0 +1,18 @@
+---
+description: Git and PR workflow rule - never auto-merge PRs; stop after opening each PR and wait for manual review and merge to main.
+alwaysApply: true
+---
+
+# PR Workflow: No Auto-Merge
+
+When delivering work across pull requests in this workspace:
+
+1. **Allowed automatically**:
+   - Create feature branches off `main`.
+   - Commit and push changes to the feature branch.
+   - Open a Pull Request (`gh pr create`).
+2. **Strictly forbidden**:
+   - **NEVER** merge a Pull Request (`gh pr merge`, `git merge` into `main`, or pushing directly to `main` after initial repo setup).
+   - **NEVER** start the next PR in the roadmap before the current PR has been reviewed and manually merged to `main` by the user.
+3. **Stop condition**:
+   - Once a PR is opened and checks pass, share the PR link with the user and **stop**. Wait for the user to review, manually merge to `main`, and instruct you to proceed to the next PR.

@@ -26,7 +26,3 @@ data/invoices/*.jpg
 .env
 .env.*
 !.env.example
-
-# Cursor local rules & config (never push to remote)
-.cursor/
-

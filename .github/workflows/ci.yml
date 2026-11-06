@@ -16,3 +16,4 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
       - run: uv run ruff check .
+      - run: uv run pytest

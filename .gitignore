@@ -26,3 +26,5 @@ data/invoices/*.jpg
 .env
 .env.*
 !.env.example
+data/invoices.jsonl
+data/*.md

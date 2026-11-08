@@ -51,7 +51,8 @@ def ocr_text(image: Path | str) -> tuple[str, float]:
     if not boxes:
         raise ValueError(f"OCR found no text in {image}")
     text = "\n".join(text for _, text, _ in boxes)
-    return text, sum(conf for _, _, conf in boxes) / len(boxes)
+    mean_confidence = sum(conf for _, _, conf in boxes) / len(boxes)
+    return text, mean_confidence
 
 
 def parse_totals(text: str, confidence: float) -> OcrTotals:
@@ -64,4 +65,5 @@ def parse_totals(text: str, confidence: float) -> OcrTotals:
 
 
 def extract_totals(image: Path | str) -> OcrTotals:
-    return parse_totals(*ocr_text(image))
+    text, mean_confidence = ocr_text(image)
+    return parse_totals(text, mean_confidence)

@@ -7,8 +7,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-# Order matters: schema first, then seed tables respecting foreign keys.
-SQL_FILES = ["schema.sql", "tenants.sql", "users.sql", "gl_accounts.sql"]
+from src.constants import SQL_FILES
 
 
 def get_paths() -> tuple[Path, Path, Path]:
@@ -21,11 +20,14 @@ def get_paths() -> tuple[Path, Path, Path]:
 
 def parse_amount(s) -> float:
     """'$ 1 234,56' / '1,234.56' / '10%' -> float. Last , or . followed by 1-2 digits is decimal."""
+    # Keep only digits, separators and minus: "$ 1 234,56" -> "1234,56".
     digits = re.sub(r"[^\d,.\-]", "", str(s))
+    # Decimal part = trailing "," or "." plus 1-2 digits: "1234,56" -> "56".
     decimal_part = re.search(r"[.,](\d{1,2})$", digits)
     whole, frac = (
         (digits[: decimal_part.start()], decimal_part[1]) if decimal_part else (digits, "0")
     )
+    # Drop thousands separators from the whole part: "1,234" -> "1234".
     return float(re.sub(r"[^\d\-]", "", whole) + "." + frac)
 
 
@@ -52,9 +54,21 @@ def insert_invoice(con: sqlite3.Connection, rec: dict, tenant_id: int) -> int:
         " client_tax_id, iban, invoice_date, posting_date, total_net, total_vat, total_gross,"
         " gl_account, image_path) VALUES (?, ?, 'purchase', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
         " '4000', ?)",
-        (tenant_id, str(h["invoice_no"]), h["seller"], h["client"], h["seller_tax_id"],
-         h["client_tax_id"], h["iban"], date, date, parse_amount(s["total_net_worth"]),
-         parse_amount(s["total_vat"]), parse_amount(s["total_gross_worth"]), rec["image"]),
+        (
+            tenant_id,
+            str(h["invoice_no"]),
+            h["seller"],
+            h["client"],
+            h["seller_tax_id"],
+            h["client_tax_id"],
+            h["iban"],
+            date,
+            date,
+            parse_amount(s["total_net_worth"]),
+            parse_amount(s["total_vat"]),
+            parse_amount(s["total_gross_worth"]),
+            rec["image"],
+        ),
     )
     return cur.lastrowid
 
@@ -64,9 +78,18 @@ def insert_line_items(con: sqlite3.Connection, invoice_id: int, items) -> None:
     con.executemany(
         "INSERT INTO line_items (invoice_id, description, qty, unit_net_price, net, vat_pct,"
         " gross) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [(invoice_id, it["item_desc"], parse_amount(it["item_qty"]),
-          parse_amount(it["item_net_price"]), parse_amount(it["item_net_worth"]),
-          parse_amount(it["item_vat"]), parse_amount(it["item_gross_worth"])) for it in items],
+        [
+            (
+                invoice_id,
+                it["item_desc"],
+                parse_amount(it["item_qty"]),
+                parse_amount(it["item_net_price"]),
+                parse_amount(it["item_net_worth"]),
+                parse_amount(it["item_vat"]),
+                parse_amount(it["item_gross_worth"]),
+            )
+            for it in items
+        ],
     )
 
 

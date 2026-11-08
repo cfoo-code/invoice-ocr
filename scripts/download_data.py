@@ -2,16 +2,10 @@
 
 import io
 import json
-import re
 import urllib.request
 from pathlib import Path
 
-DATA_DIR = Path("data")
-INVOICE_DATASET = "katanaml-org/invoices-donut-data-v1"
-TES_URL = "https://tietoala.fi/wp-content/uploads/2026/09/TES_englanti_2025_korj_2_9_2026.pdf"
-
-# "§ 12  Additional work, overtime and Sunday work" without TOC dot leaders / page numbers.
-SECTION_RE = re.compile(r"^\s*§\s*(\d+)\s+([^.\d][^.]*?)\s*$")
+from src.constants import DATA_DIR, INVOICE_DATASET, SECTION_RE, TES_URL
 
 
 def download_invoices(data_dir: Path = DATA_DIR) -> int:
@@ -32,7 +26,9 @@ def download_invoices(data_dir: Path = DATA_DIR) -> int:
 
 
 def tes_text_to_markdown(text: str) -> str:
-    lines = [f"# Collective Agreement of the IT Service Sector in Finland 2025-2027\n\nSource: {TES_URL}\n"]
+    lines = [
+        f"# Collective Agreement of the IT Service Sector in Finland 2025-2027\n\nSource: {TES_URL}\n"
+    ]
     for line in text.splitlines():
         m = SECTION_RE.match(line)
         lines.append(f"\n## § {m[1]} {m[2]}\n" if m else line.rstrip())

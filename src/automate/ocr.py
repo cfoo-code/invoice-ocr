@@ -1,0 +1,59 @@
+"""Tier-1 document understanding: local RapidOCR + accounting checksum gate (Net + VAT == Gross)."""
+
+from functools import cache
+from pathlib import Path
+
+from pydantic import BaseModel, model_validator
+from rapidocr_onnxruntime import RapidOCR
+
+from src.constants import CENT, MIN_CONFIDENCE, TOTALS_RE
+from src.db.db import parse_amount
+
+
+class OcrTotals(BaseModel):
+    """Raises ValidationError when the checksum or confidence gate fails -> escalate to Tier 2."""
+
+    total_net: float
+    total_vat: float
+    total_gross: float
+    confidence: float
+
+    @model_validator(mode="after")
+    def checksum(self):
+        if abs(self.total_net + self.total_vat - self.total_gross) > CENT:
+            raise ValueError(
+                f"checksum failed: {self.total_net} + {self.total_vat} != {self.total_gross}"
+            )
+        if self.confidence < MIN_CONFIDENCE:
+            raise ValueError(f"OCR confidence {self.confidence:.2f} < {MIN_CONFIDENCE}")
+        return self
+
+
+@cache
+def _engine() -> RapidOCR:
+    return RapidOCR()
+
+
+def ocr_text(image: Path | str) -> tuple[str, float]:
+    """(text lines joined by newline, mean box confidence). No text detected -> ValueError."""
+    # One box per detected text region: [corner_points, text, confidence]; None if no text.
+    boxes = _engine()(str(image))[0]
+    if not boxes:
+        raise ValueError(f"OCR found no text in {image}")
+    text = "\n".join(text for _, text, _ in boxes)
+    mean_confidence = sum(conf for _, _, conf in boxes) / len(boxes)
+    return text, mean_confidence
+
+
+def parse_totals(text: str, confidence: float) -> OcrTotals:
+    """Last 'Total' row wins (summary sits at the bottom). No match -> ValueError."""
+    matches = TOTALS_RE.findall(" ".join(text.split()))
+    if not matches:
+        raise ValueError("no totals row found in OCR text")
+    net, vat, gross = map(parse_amount, matches[-1])
+    return OcrTotals(total_net=net, total_vat=vat, total_gross=gross, confidence=confidence)
+
+
+def extract_totals(image: Path | str) -> OcrTotals:
+    text, mean_confidence = ocr_text(image)
+    return parse_totals(text, mean_confidence)

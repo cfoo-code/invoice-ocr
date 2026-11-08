@@ -42,17 +42,8 @@ CREATE TABLE line_items (
 CREATE INDEX ix_invoices_tenant_date ON invoices(tenant_id, invoice_date);
 """
 
-TENANTS = [(1, "Nordic Demo Oy"), (2, "Helsinki Consulting Oy")]
-USERS = [
-    (1, 1, "accountant@nordic.example", 1, 1, 10000.0),
-    (2, 1, "clerk@nordic.example", 0, 1, 1000.0),
-    (3, 2, "viewer@helsinki.example", 0, 0, 0.0),
-]
-GL_ACCOUNTS = [
-    ("3000", "Sales revenue"),
-    ("4000", "Purchases of goods"),
-    ("7600", "Other operating expenses"),
-]
+FAKE = json.loads((Path(__file__).parent / "fake_data.json").read_text())
+TENANTS, USERS, GL_ACCOUNTS = FAKE["tenants"], FAKE["users"], FAKE["gl_accounts"]
 
 
 def parse_amount(s) -> float | None:

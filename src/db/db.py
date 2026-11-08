@@ -21,9 +21,11 @@ def get_paths() -> tuple[Path, Path, Path]:
 
 def parse_amount(s) -> float:
     """'$ 1 234,56' / '1,234.56' / '10%' -> float. Last , or . followed by 1-2 digits is decimal."""
-    s = re.sub(r"[^\d,.\-]", "", str(s))
-    m = re.search(r"[.,](\d{1,2})$", s)
-    whole, frac = (s[: m.start()], m[1]) if m else (s, "0")
+    digits = re.sub(r"[^\d,.\-]", "", str(s))
+    decimal_part = re.search(r"[.,](\d{1,2})$", digits)
+    whole, frac = (
+        (digits[: decimal_part.start()], decimal_part[1]) if decimal_part else (digits, "0")
+    )
     return float(re.sub(r"[^\d\-]", "", whole) + "." + frac)
 
 

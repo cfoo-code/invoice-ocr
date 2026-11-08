@@ -17,7 +17,8 @@ def test_parse_amount_handles_eu_and_us_formats():
 VALID = {
     "image": "data/invoices/train_000.png",
     "header": {"invoice_no": 123, "invoice_date": "01/02/2020", "seller": "ACME",
-               "client": "Bob"},
+               "client": "Bob", "seller_tax_id": "111-22-3333", "client_tax_id": "444-55-6666",
+               "iban": "GB00TEST0000000000"},
     "items": {"item_desc": "Chair", "item_qty": "2,00", "item_net_price": "50,00",
               "item_net_worth": "100,00", "item_vat": "10%", "item_gross_worth": "110,00"},
     "summary": {"total_net_worth": "$ 100,00", "total_vat": "$ 10,00",

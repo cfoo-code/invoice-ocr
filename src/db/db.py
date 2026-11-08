@@ -48,8 +48,8 @@ def insert_invoice(con: sqlite3.Connection, rec: dict, tenant_id: int) -> int:
         " client_tax_id, iban, invoice_date, posting_date, total_net, total_vat, total_gross,"
         " gl_account, image_path) VALUES (?, ?, 'purchase', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
         " '4000', ?)",
-        (tenant_id, str(h["invoice_no"]), h["seller"], h["client"], h.get("seller_tax_id"),
-         h.get("client_tax_id"), h.get("iban"), date, date, parse_amount(s["total_net_worth"]),
+        (tenant_id, str(h["invoice_no"]), h["seller"], h["client"], h["seller_tax_id"],
+         h["client_tax_id"], h["iban"], date, date, parse_amount(s["total_net_worth"]),
          parse_amount(s["total_vat"]), parse_amount(s["total_gross_worth"]), rec["image"]),
     )
     return cur.lastrowid

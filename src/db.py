@@ -7,12 +7,14 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path(os.environ.get("DB_PATH", "data/procountor_ledger.db"))
-INVOICES_JSONL = Path("data/invoices.jsonl")
-
-SQL_DIR = Path(__file__).parent / "sql"
 # Order matters: schema first, then seed tables respecting foreign keys.
 SQL_FILES = ["schema.sql", "tenants.sql", "users.sql", "gl_accounts.sql"]
+
+
+def get_paths() -> tuple[Path, Path, Path]:
+    """(db file, sql scripts dir, invoices jsonl). DB_PATH env var overrides the db file."""
+    db_path = Path(os.environ.get("DB_PATH", "data/procountor_ledger.db"))
+    return db_path, Path(__file__).parent / "sql", Path("data/invoices.jsonl")
 
 
 def parse_amount(s) -> float | None:
@@ -32,42 +34,58 @@ def parse_date(s) -> str:
     return datetime.strptime(str(s).strip(), "%m/%d/%Y").date().isoformat()
 
 
-def build_db(db_path: Path = DB_PATH, jsonl: Path = INVOICES_JSONL) -> sqlite3.Connection:
+def create_db(db_path: Path, sql_dir: Path) -> sqlite3.Connection:
+    """Fresh db file with schema and fake seed tables."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     db_path.unlink(missing_ok=True)
     con = sqlite3.connect(db_path)
     for f in SQL_FILES:
-        con.executescript((SQL_DIR / f).read_text())
+        con.executescript((sql_dir / f).read_text())
+    return con
+
+
+def insert_invoice(con: sqlite3.Connection, rec: dict, tenant_id: int) -> int:
+    h, s = rec.get("header", {}), rec.get("summary", {})
+    date = parse_date(h.get("invoice_date"))
+    cur = con.execute(
+        "INSERT INTO invoices (tenant_id, invoice_no, direction, seller, client, seller_tax_id,"
+        " client_tax_id, iban, invoice_date, posting_date, total_net, total_vat, total_gross,"
+        " gl_account, image_path) VALUES (?, ?, 'purchase', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
+        " '4000', ?)",
+        (tenant_id, str(h.get("invoice_no", "")), h.get("seller"), h.get("client"),
+         h.get("seller_tax_id"), h.get("client_tax_id"), h.get("iban"), date, date,
+         parse_amount(s.get("total_net_worth")), parse_amount(s.get("total_vat")),
+         parse_amount(s.get("total_gross_worth")), rec.get("image")),
+    )
+    return cur.lastrowid
+
+
+def insert_line_items(con: sqlite3.Connection, invoice_id: int, items) -> None:
+    items = items if isinstance(items, list) else [items]
+    con.executemany(
+        "INSERT INTO line_items (invoice_id, description, qty, unit_net_price, net, vat_pct,"
+        " gross) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [(invoice_id, it.get("item_desc"), parse_amount(it.get("item_qty")),
+          parse_amount(it.get("item_net_price")), parse_amount(it.get("item_net_worth")),
+          parse_amount(it.get("item_vat")), parse_amount(it.get("item_gross_worth")))
+         for it in items],
+    )
+
+
+def build_db(db_path: Path | None = None, jsonl: Path | None = None) -> sqlite3.Connection:
+    default_db, sql_dir, default_jsonl = get_paths()
+    con = create_db(db_path or default_db, sql_dir)
     n_tenants = con.execute("SELECT COUNT(*) FROM tenants").fetchone()[0]
-    for i, line in enumerate(jsonl.read_text().splitlines()):
+    for i, line in enumerate((jsonl or default_jsonl).read_text().splitlines()):
         rec = json.loads(line)
-        h, s = rec.get("header", {}), rec.get("summary", {})
         # ponytail: tenant = row parity; swap for a real seller->tenant mapping if needed.
-        tenant_id = i % n_tenants + 1
-        date = parse_date(h.get("invoice_date"))
-        cur = con.execute(
-            "INSERT INTO invoices (tenant_id, invoice_no, direction, seller, client, seller_tax_id,"
-            " client_tax_id, iban, invoice_date, posting_date, total_net, total_vat, total_gross,"
-            " gl_account, image_path) VALUES (?, ?, 'purchase', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
-            " '4000', ?)",
-            (tenant_id, str(h.get("invoice_no", "")), h.get("seller"), h.get("client"),
-             h.get("seller_tax_id"), h.get("client_tax_id"), h.get("iban"), date, date,
-             parse_amount(s.get("total_net_worth")), parse_amount(s.get("total_vat")),
-             parse_amount(s.get("total_gross_worth")), rec.get("image")),
-        )
-        items = rec.get("items", [])
-        con.executemany(
-            "INSERT INTO line_items (invoice_id, description, qty, unit_net_price, net, vat_pct,"
-            " gross) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [(cur.lastrowid, it.get("item_desc"), parse_amount(it.get("item_qty")),
-              parse_amount(it.get("item_net_price")), parse_amount(it.get("item_net_worth")),
-              parse_amount(it.get("item_vat")), parse_amount(it.get("item_gross_worth")))
-             for it in (items if isinstance(items, list) else [items])],
-        )
+        invoice_id = insert_invoice(con, rec, tenant_id=i % n_tenants + 1)
+        insert_line_items(con, invoice_id, rec.get("items", []))
     con.commit()
     return con
 
 
 if __name__ == "__main__":
     con = build_db()
-    print(f"invoices: {con.execute('SELECT COUNT(*) FROM invoices').fetchone()[0]} -> {DB_PATH}")
+    n = con.execute("SELECT COUNT(*) FROM invoices").fetchone()[0]
+    print(f"invoices: {n} -> {get_paths()[0]}")

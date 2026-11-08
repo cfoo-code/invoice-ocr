@@ -43,7 +43,7 @@ This project demonstrates end-to-end production AI Engineering tailored to Finag
 ## 3. Database & Reproducibility Design
 
 - **Database Engine**: Python standard-library `sqlite3` (`data/procountor_ledger.db`, configurable via `DB_PATH`).
-- **Why `.gitignore` `*.db`**: Binary SQLite files cause noisy diffs when mutated during local testing. Instead, `src/db.py` deterministically initializes and populates `procountor_ledger.db` from the downloaded dataset in `<0.5s`.
+- **Why `.gitignore` `*.db`**: Binary SQLite files cause noisy diffs when mutated during local testing. Instead, `src/db/db.py` deterministically initializes and populates `procountor_ledger.db` from the downloaded dataset in `<0.5s`.
 - **Reproducibility (Docker + Offline Fallback)**:
   - Multi-stage `Dockerfile` and `docker-compose.yml` pin all dependencies and pre-bake the SQLite ledger and OCR runtime weights during build.
   - Supports **Live LLM Mode** (when `OPENAI_API_KEY` is set) and **Deterministic Test/Offline Mode** (using `Pydantic AI`'s `FunctionModel` / `TestModel`), guaranteeing `pytest` and `docker compose up` work out-of-the-box for any reviewer.

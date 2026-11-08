@@ -3,7 +3,8 @@ import json
 import pytest
 from pydantic import ValidationError
 
-from src.db import InvoiceRecord, build_db, parse_amount, parse_date
+from src.db.db import build_db
+from src.db.db_schema import InvoiceRecord, parse_amount, parse_date
 
 
 def test_parse_amount_handles_eu_and_us_formats():

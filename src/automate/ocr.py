@@ -47,7 +47,7 @@ def _engine() -> RapidOCR:
 def ocr_text(image: Path | str) -> tuple[str, float]:
     """(text lines joined by newline, mean box confidence). No text detected -> ValueError."""
     # One box per detected text region: [corner_points, text, confidence]; None if no text.
-    boxes, _ = _engine()(str(image))
+    boxes, _elapsed = _engine()(str(image))
     if not boxes:
         raise ValueError(f"OCR found no text in {image}")
     text = "\n".join(text for _, text, _ in boxes)

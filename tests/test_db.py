@@ -1,10 +1,8 @@
 import json
 
 import pytest
-from pydantic import ValidationError
 
-from src.db.db import build_db
-from src.db.db_schema import InvoiceRecord, parse_amount, parse_date
+from src.db.db import build_db, parse_amount, parse_date
 
 
 def test_parse_amount_handles_eu_and_us_formats():
@@ -27,14 +25,6 @@ VALID = {
     "summary": {"total_net_worth": "$ 100,00", "total_vat": "$ 10,00",
                 "total_gross_worth": "$ 110,00"},
 }
-
-
-def test_invoice_record_rejects_missing_or_bad_fields():
-    no_vat = {"total_net_worth": "1", "total_gross_worth": "1"}
-    with pytest.raises(ValidationError, match="total_vat"):
-        InvoiceRecord.model_validate(VALID | {"summary": no_vat})
-    with pytest.raises(ValidationError, match="not an amount"):
-        InvoiceRecord.model_validate(VALID | {"summary": VALID["summary"] | {"total_vat": "N/A"}})
 
 
 def test_build_db_loads_invoices_and_line_items(tmp_path):

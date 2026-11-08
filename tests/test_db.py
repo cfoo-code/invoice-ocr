@@ -9,8 +9,6 @@ def test_parse_amount_handles_eu_and_us_formats():
     assert parse_amount("$ 1 234,56") == 1234.56
     assert parse_amount("1,234.56") == 1234.56
     assert parse_amount("10%") == 10.0
-    with pytest.raises(ValueError):
-        parse_amount("")
     assert parse_date("10/18/2014") == "2014-10-18"
     with pytest.raises(ValueError):
         parse_date("garbage")

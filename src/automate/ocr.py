@@ -1,23 +1,13 @@
 """Tier-1 document understanding: local RapidOCR + accounting checksum gate (Net + VAT == Gross)."""
 
-import re
 from functools import cache
 from pathlib import Path
 
 from pydantic import BaseModel, model_validator
 from rapidocr_onnxruntime import RapidOCR
 
+from src.constants import CENT, MIN_CONFIDENCE, TOTALS_RE
 from src.db.db import parse_amount
-
-MIN_CONFIDENCE = 0.8
-CENT = 0.011
-
-# One money amount, captured without the "$": optional "$ ", then digits (spaces allowed as
-# thousands separators), then "," or "." and exactly 2 decimals. e.g. "$ 1 234,56" -> "1 234,56".
-AMOUNT = r"\$?\s?(\d[\d ]*[.,]\d{2})"
-# Donut invoice summary row: "Total" followed by 3 amounts (net, vat, gross),
-# e.g. "Total $ 1 234,56 $ 123,45 $ 1 358,01".
-TOTALS_RE = re.compile(rf"Total\s+{AMOUNT}\s+{AMOUNT}\s+{AMOUNT}")
 
 
 class OcrTotals(BaseModel):

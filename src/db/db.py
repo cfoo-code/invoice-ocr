@@ -7,8 +7,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-# Order matters: schema first, then seed tables respecting foreign keys.
-SQL_FILES = ["schema.sql", "tenants.sql", "users.sql", "gl_accounts.sql"]
+from src.constants import SQL_FILES
 
 
 def get_paths() -> tuple[Path, Path, Path]:

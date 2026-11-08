@@ -1,11 +1,13 @@
 """SQLite ledger: schema + deterministic loader from data/invoices.jsonl (katanaml donut gt)."""
 
-import json
 import os
 import re
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import Annotated
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, field_validator
 
 # Order matters: schema first, then seed tables respecting foreign keys.
 SQL_FILES = ["schema.sql", "tenants.sql", "users.sql", "gl_accounts.sql"]
@@ -17,13 +19,11 @@ def get_paths() -> tuple[Path, Path, Path]:
     return db_path, Path(__file__).parent / "sql", Path("data/invoices.jsonl")
 
 
-def parse_amount(s) -> float | None:
+def parse_amount(s) -> float:
     """'$ 1 234,56' / '1,234.56' / '10%' -> float. Last , or . followed by 1-2 digits is decimal."""
-    if s is None:
-        return None
-    s = re.sub(r"[^\d,.\-]", "", str(s))
+    raw, s = s, re.sub(r"[^\d,.\-]", "", str(s))
     if not re.search(r"\d", s):
-        return None
+        raise ValueError(f"not an amount: {raw!r}")
     m = re.search(r"[.,](\d{1,2})$", s)
     whole, frac = (s[: m.start()], m[1]) if m else (s, "0")
     return float(re.sub(r"[^\d\-]", "", whole) + "." + frac)
@@ -32,6 +32,51 @@ def parse_amount(s) -> float | None:
 def parse_date(s) -> str:
     """Donut dates are US 'MM/DD/YYYY'; store ISO so SQL range filters work."""
     return datetime.strptime(str(s).strip(), "%m/%d/%Y").date().isoformat()
+
+
+Amount = Annotated[float, BeforeValidator(parse_amount)]
+IsoDate = Annotated[str, BeforeValidator(parse_date)]
+
+
+class Record(BaseModel):
+    model_config = ConfigDict(coerce_numbers_to_str=True)
+
+
+class Header(Record):
+    invoice_no: str
+    invoice_date: IsoDate
+    seller: str
+    client: str
+    seller_tax_id: str | None = None
+    client_tax_id: str | None = None
+    iban: str | None = None
+
+
+class Summary(Record):
+    total_net_worth: Amount
+    total_vat: Amount
+    total_gross_worth: Amount
+
+
+class Item(Record):
+    item_desc: str
+    item_qty: Amount
+    item_net_price: Amount
+    item_net_worth: Amount
+    item_vat: Amount
+    item_gross_worth: Amount
+
+
+class InvoiceRecord(Record):
+    image: str
+    header: Header
+    summary: Summary
+    items: list[Item]
+
+    @field_validator("items", mode="before")
+    @classmethod
+    def wrap_single_item(cls, v):
+        return v if isinstance(v, list) else [v]
 
 
 def create_db(db_path: Path, sql_dir: Path) -> sqlite3.Connection:
@@ -44,31 +89,26 @@ def create_db(db_path: Path, sql_dir: Path) -> sqlite3.Connection:
     return con
 
 
-def insert_invoice(con: sqlite3.Connection, rec: dict, tenant_id: int) -> int:
-    h, s = rec.get("header", {}), rec.get("summary", {})
-    date = parse_date(h.get("invoice_date"))
+def insert_invoice(con: sqlite3.Connection, rec: InvoiceRecord, tenant_id: int) -> int:
+    h, s = rec.header, rec.summary
     cur = con.execute(
         "INSERT INTO invoices (tenant_id, invoice_no, direction, seller, client, seller_tax_id,"
         " client_tax_id, iban, invoice_date, posting_date, total_net, total_vat, total_gross,"
         " gl_account, image_path) VALUES (?, ?, 'purchase', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
         " '4000', ?)",
-        (tenant_id, str(h.get("invoice_no", "")), h.get("seller"), h.get("client"),
-         h.get("seller_tax_id"), h.get("client_tax_id"), h.get("iban"), date, date,
-         parse_amount(s.get("total_net_worth")), parse_amount(s.get("total_vat")),
-         parse_amount(s.get("total_gross_worth")), rec.get("image")),
+        (tenant_id, h.invoice_no, h.seller, h.client, h.seller_tax_id, h.client_tax_id, h.iban,
+         h.invoice_date, h.invoice_date, s.total_net_worth, s.total_vat, s.total_gross_worth,
+         rec.image),
     )
     return cur.lastrowid
 
 
-def insert_line_items(con: sqlite3.Connection, invoice_id: int, items) -> None:
-    items = items if isinstance(items, list) else [items]
+def insert_line_items(con: sqlite3.Connection, invoice_id: int, items: list[Item]) -> None:
     con.executemany(
         "INSERT INTO line_items (invoice_id, description, qty, unit_net_price, net, vat_pct,"
         " gross) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [(invoice_id, it.get("item_desc"), parse_amount(it.get("item_qty")),
-          parse_amount(it.get("item_net_price")), parse_amount(it.get("item_net_worth")),
-          parse_amount(it.get("item_vat")), parse_amount(it.get("item_gross_worth")))
-         for it in items],
+        [(invoice_id, it.item_desc, it.item_qty, it.item_net_price, it.item_net_worth,
+          it.item_vat, it.item_gross_worth) for it in items],
     )
 
 
@@ -77,10 +117,10 @@ def build_db(db_path: Path | None = None, jsonl: Path | None = None) -> sqlite3.
     con = create_db(db_path or default_db, sql_dir)
     n_tenants = con.execute("SELECT COUNT(*) FROM tenants").fetchone()[0]
     for i, line in enumerate((jsonl or default_jsonl).read_text().splitlines()):
-        rec = json.loads(line)
+        rec = InvoiceRecord.model_validate_json(line)
         # ponytail: tenant = row parity; swap for a real seller->tenant mapping if needed.
         invoice_id = insert_invoice(con, rec, tenant_id=i % n_tenants + 1)
-        insert_line_items(con, invoice_id, rec.get("items", []))
+        insert_line_items(con, invoice_id, rec.items)
     con.commit()
     return con
 

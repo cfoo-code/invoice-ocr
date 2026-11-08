@@ -1,31 +1,44 @@
 import json
 
 import pytest
+from pydantic import ValidationError
 
-from src.db import build_db, parse_amount, parse_date
+from src.db import InvoiceRecord, build_db, parse_amount, parse_date
 
 
 def test_parse_amount_handles_eu_and_us_formats():
     assert parse_amount("$ 1 234,56") == 1234.56
     assert parse_amount("1,234.56") == 1234.56
     assert parse_amount("10%") == 10.0
-    assert parse_amount("") is None
+    with pytest.raises(ValueError):
+        parse_amount("")
     assert parse_date("10/18/2014") == "2014-10-18"
     with pytest.raises(ValueError):
         parse_date("garbage")
 
 
+VALID = {
+    "image": "data/invoices/train_000.png",
+    "header": {"invoice_no": 123, "invoice_date": "01/02/2020", "seller": "ACME",
+               "client": "Bob"},
+    "items": {"item_desc": "Chair", "item_qty": "2,00", "item_net_price": "50,00",
+              "item_net_worth": "100,00", "item_vat": "10%", "item_gross_worth": "110,00"},
+    "summary": {"total_net_worth": "$ 100,00", "total_vat": "$ 10,00",
+                "total_gross_worth": "$ 110,00"},
+}
+
+
+def test_invoice_record_rejects_missing_or_bad_fields():
+    no_vat = {"total_net_worth": "1", "total_gross_worth": "1"}
+    with pytest.raises(ValidationError, match="total_vat"):
+        InvoiceRecord.model_validate(VALID | {"summary": no_vat})
+    with pytest.raises(ValidationError, match="not an amount"):
+        InvoiceRecord.model_validate(VALID | {"summary": VALID["summary"] | {"total_vat": "N/A"}})
+
+
 def test_build_db_loads_invoices_and_line_items(tmp_path):
-    rec = {
-        "image": "data/invoices/train_000.png",
-        "header": {"invoice_no": "123", "invoice_date": "01/02/2020", "seller": "ACME"},
-        "items": [{"item_desc": "Chair", "item_qty": "2,00", "item_net_worth": "100,00",
-                   "item_vat": "10%", "item_gross_worth": "110,00"}],
-        "summary": {"total_net_worth": "$ 100,00", "total_vat": "$ 10,00",
-                    "total_gross_worth": "$ 110,00"},
-    }
     jsonl = tmp_path / "inv.jsonl"
-    jsonl.write_text("\n".join(json.dumps(rec) for _ in range(3)))
+    jsonl.write_text("\n".join(json.dumps(VALID) for _ in range(3)))
     con = build_db(tmp_path / "t.db", jsonl)
     assert con.execute("SELECT COUNT(*) FROM invoices").fetchone()[0] == 3
     assert con.execute("SELECT COUNT(DISTINCT tenant_id) FROM invoices").fetchone()[0] == 2

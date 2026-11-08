@@ -42,7 +42,7 @@ def create_db(db_path: Path, sql_dir: Path) -> sqlite3.Connection:
     db_path.unlink(missing_ok=True)
     con = sqlite3.connect(db_path)
     for f in SQL_FILES:
-        con.executescript((sql_dir / f).read_text())
+        con.executescript((sql_dir / f).read_text(encoding="utf-8"))
     return con
 
 
@@ -57,11 +57,11 @@ def insert_invoice(con: sqlite3.Connection, rec: dict, tenant_id: int) -> int:
         (
             tenant_id,
             str(h["invoice_no"]),
-            h["seller"],
-            h["client"],
-            h["seller_tax_id"],
-            h["client_tax_id"],
-            h["iban"],
+            h.get("seller"),
+            h.get("client"),
+            h.get("seller_tax_id"),
+            h.get("client_tax_id"),
+            h.get("iban"),
             date,
             date,
             parse_amount(s["total_net_worth"]),
@@ -81,12 +81,18 @@ def insert_line_items(con: sqlite3.Connection, invoice_id: int, items) -> None:
         [
             (
                 invoice_id,
-                it["item_desc"],
-                parse_amount(it["item_qty"]),
-                parse_amount(it["item_net_price"]),
-                parse_amount(it["item_net_worth"]),
-                parse_amount(it["item_vat"]),
-                parse_amount(it["item_gross_worth"]),
+                it.get("item_desc"),
+                *(
+                    None if v is None else parse_amount(v)
+                    # Dataset annotations sometimes say total_net_worth or omit the field.
+                    for v in (
+                        it.get("item_qty"),
+                        it.get("item_net_price"),
+                        it.get("item_net_worth", it.get("total_net_worth")),
+                        it.get("item_vat"),
+                        it.get("item_gross_worth"),
+                    )
+                ),
             )
             for it in items
         ],
@@ -97,11 +103,17 @@ def build_db(db_path: Path | None = None, jsonl: Path | None = None) -> sqlite3.
     default_db, sql_dir, default_jsonl = get_paths()
     con = create_db(db_path or default_db, sql_dir)
     n_tenants = con.execute("SELECT COUNT(*) FROM tenants").fetchone()[0]
-    for i, line in enumerate((jsonl or default_jsonl).read_text().splitlines()):
+    for i, line in enumerate((jsonl or default_jsonl).read_text(encoding="utf-8").splitlines()):
         rec = json.loads(line)
+        h, s = rec.get("header") or {}, rec.get("summary") or {}
+        # ~12 dataset records have incomplete annotations; they can't serve as ground truth.
+        if not all(k in h for k in ("invoice_no", "invoice_date")) or not all(
+            k in s for k in ("total_net_worth", "total_vat", "total_gross_worth")
+        ):
+            continue
         # ponytail: tenant = row parity; swap for a real seller->tenant mapping if needed.
         invoice_id = insert_invoice(con, rec, tenant_id=i % n_tenants + 1)
-        insert_line_items(con, invoice_id, rec["items"])
+        insert_line_items(con, invoice_id, rec.get("items") or [])
     con.commit()
     return con
 

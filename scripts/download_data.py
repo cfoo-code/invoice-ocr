@@ -14,7 +14,7 @@ def download_invoices(data_dir: Path = DATA_DIR) -> int:
     img_dir = data_dir / "invoices"
     img_dir.mkdir(parents=True, exist_ok=True)
     n = 0
-    with open(data_dir / "invoices.jsonl", "w") as out:
+    with open(data_dir / "invoices.jsonl", "w", encoding="utf-8") as out:
         for split, rows in load_dataset(INVOICE_DATASET).items():
             for i, row in enumerate(rows):
                 image_path = img_dir / f"{split}_{i:03d}.png"
@@ -42,7 +42,9 @@ def download_tes(data_dir: Path = DATA_DIR) -> Path:
         pdf = PdfReader(io.BytesIO(resp.read()))
     out = data_dir / "finnish_it_tes_2025_2027.md"
     data_dir.mkdir(parents=True, exist_ok=True)
-    out.write_text(tes_text_to_markdown("\n".join(p.extract_text() for p in pdf.pages)))
+    out.write_text(
+        tes_text_to_markdown("\n".join(p.extract_text() for p in pdf.pages)), encoding="utf-8"
+    )
     return out
 
 

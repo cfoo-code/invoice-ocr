@@ -32,7 +32,7 @@ class OcrTotals(BaseModel):
     def checksum(self):
         if abs(self.total_net + self.total_vat - self.total_gross) > CENT:
             raise ValueError(
-                f"checksum failed: {self.total_net} + {self.total_vat} " f"!= {self.total_gross}"
+                f"checksum failed: {self.total_net} + {self.total_vat} != {self.total_gross}"
             )
         if self.confidence < MIN_CONFIDENCE:
             raise ValueError(f"OCR confidence {self.confidence:.2f} < {MIN_CONFIDENCE}")

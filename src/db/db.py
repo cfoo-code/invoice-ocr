@@ -14,7 +14,9 @@ SQL_FILES = ["schema.sql", "tenants.sql", "users.sql", "gl_accounts.sql"]
 def get_paths() -> tuple[Path, Path, Path]:
     """(db file, sql scripts dir, invoices jsonl). DB_PATH env var overrides the db file."""
     db_path = Path(os.environ.get("DB_PATH", "data/procountor_ledger.db"))
-    return db_path, Path(__file__).parent / "sql", Path("data/invoices.jsonl")
+    sql_dir = Path(__file__).parent / "sql"
+    invoices_jsonl = Path("data/invoices.jsonl")
+    return db_path, sql_dir, invoices_jsonl
 
 
 def parse_amount(s) -> float:

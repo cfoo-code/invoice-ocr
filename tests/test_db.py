@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from src.db import build_db, parse_amount, parse_date
 
 
@@ -9,7 +11,8 @@ def test_parse_amount_handles_eu_and_us_formats():
     assert parse_amount("10%") == 10.0
     assert parse_amount("") is None
     assert parse_date("10/18/2014") == "2014-10-18"
-    assert parse_date("garbage") is None
+    with pytest.raises(ValueError):
+        parse_date("garbage")
 
 
 def test_build_db_loads_invoices_and_line_items(tmp_path):

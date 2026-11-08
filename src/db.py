@@ -67,12 +67,9 @@ def parse_amount(s) -> float | None:
     return float(re.sub(r"[^\d\-]", "", whole) + "." + frac)
 
 
-def parse_date(s) -> str | None:
+def parse_date(s) -> str:
     """Donut dates are US 'MM/DD/YYYY'; store ISO so SQL range filters work."""
-    try:
-        return datetime.strptime(str(s).strip(), "%m/%d/%Y").date().isoformat()
-    except ValueError:
-        return None
+    return datetime.strptime(str(s).strip(), "%m/%d/%Y").date().isoformat()
 
 
 def build_db(db_path: Path = DB_PATH, jsonl: Path = INVOICES_JSONL) -> sqlite3.Connection:

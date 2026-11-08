@@ -5,14 +5,18 @@ from functools import cache
 from pathlib import Path
 
 from pydantic import BaseModel, model_validator
+from rapidocr_onnxruntime import RapidOCR
 
 from src.db.db import parse_amount
 
 MIN_CONFIDENCE = 0.8
 CENT = 0.011
 
+# One money amount, captured without the "$": optional "$ ", then digits (spaces allowed as
+# thousands separators), then "," or "." and exactly 2 decimals. e.g. "$ 1 234,56" -> "1 234,56".
 AMOUNT = r"\$?\s?(\d[\d ]*[.,]\d{2})"
-# Donut invoice summary row: "Total $ 1 234,56 $ 123,45 $ 1 358,01" (net, vat, gross).
+# Donut invoice summary row: "Total" followed by 3 amounts (net, vat, gross),
+# e.g. "Total $ 1 234,56 $ 123,45 $ 1 358,01".
 TOTALS_RE = re.compile(rf"Total\s+{AMOUNT}\s+{AMOUNT}\s+{AMOUNT}")
 
 
@@ -27,26 +31,27 @@ class OcrTotals(BaseModel):
     @model_validator(mode="after")
     def checksum(self):
         if abs(self.total_net + self.total_vat - self.total_gross) > CENT:
-            raise ValueError(f"checksum failed: {self.total_net} + {self.total_vat} "
-                             f"!= {self.total_gross}")
+            raise ValueError(
+                f"checksum failed: {self.total_net} + {self.total_vat} " f"!= {self.total_gross}"
+            )
         if self.confidence < MIN_CONFIDENCE:
             raise ValueError(f"OCR confidence {self.confidence:.2f} < {MIN_CONFIDENCE}")
         return self
 
 
 @cache
-def _engine():
-    from rapidocr_onnxruntime import RapidOCR
-
+def _engine() -> RapidOCR:
     return RapidOCR()
 
 
 def ocr_text(image: Path | str) -> tuple[str, float]:
-    """(text lines joined by newline, mean box confidence). Empty image -> ('', 0.0)."""
+    """(text lines joined by newline, mean box confidence). No text detected -> ValueError."""
+    # One box per detected text region: [corner_points, text, confidence]; None if no text.
     boxes, _ = _engine()(str(image))
-    boxes = boxes or []
-    text = "\n".join(b[1] for b in boxes)
-    return text, sum(b[2] for b in boxes) / len(boxes) if boxes else 0.0
+    if not boxes:
+        raise ValueError(f"OCR found no text in {image}")
+    text = "\n".join(text for _, text, _ in boxes)
+    return text, sum(conf for _, _, conf in boxes) / len(boxes)
 
 
 def parse_totals(text: str, confidence: float) -> OcrTotals:

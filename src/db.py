@@ -10,40 +10,9 @@ from pathlib import Path
 DB_PATH = Path(os.environ.get("DB_PATH", "data/procountor_ledger.db"))
 INVOICES_JSONL = Path("data/invoices.jsonl")
 
-SCHEMA = """
-CREATE TABLE tenants (id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
-CREATE TABLE users (
-    id INTEGER PRIMARY KEY,
-    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
-    email TEXT NOT NULL UNIQUE,
-    has_payroll_rights INTEGER NOT NULL DEFAULT 0,
-    can_create_invoices INTEGER NOT NULL DEFAULT 0,
-    approval_limit REAL NOT NULL DEFAULT 0
-);
-CREATE TABLE gl_accounts (code TEXT PRIMARY KEY, name TEXT NOT NULL);
-CREATE TABLE invoices (
-    id INTEGER PRIMARY KEY,
-    tenant_id INTEGER NOT NULL REFERENCES tenants(id),
-    invoice_no TEXT NOT NULL,
-    direction TEXT NOT NULL CHECK (direction IN ('sales', 'purchase')),
-    seller TEXT, client TEXT, seller_tax_id TEXT, client_tax_id TEXT, iban TEXT,
-    invoice_date TEXT, posting_date TEXT,
-    total_net REAL, total_vat REAL, total_gross REAL,
-    gl_account TEXT REFERENCES gl_accounts(code),
-    status TEXT NOT NULL DEFAULT 'POSTED',
-    image_path TEXT
-);
-CREATE TABLE line_items (
-    id INTEGER PRIMARY KEY,
-    invoice_id INTEGER NOT NULL REFERENCES invoices(id),
-    description TEXT, qty REAL, unit_net_price REAL,
-    net REAL, vat_pct REAL, gross REAL
-);
-CREATE INDEX ix_invoices_tenant_date ON invoices(tenant_id, invoice_date);
-"""
-
-FAKE = json.loads((Path(__file__).parent / "fake_data.json").read_text())
-TENANTS, USERS, GL_ACCOUNTS = FAKE["tenants"], FAKE["users"], FAKE["gl_accounts"]
+SQL_DIR = Path(__file__).parent / "sql"
+# Order matters: schema first, then seed tables respecting foreign keys.
+SQL_FILES = ["schema.sql", "tenants.sql", "users.sql", "gl_accounts.sql"]
 
 
 def parse_amount(s) -> float | None:
@@ -67,15 +36,14 @@ def build_db(db_path: Path = DB_PATH, jsonl: Path = INVOICES_JSONL) -> sqlite3.C
     db_path.parent.mkdir(parents=True, exist_ok=True)
     db_path.unlink(missing_ok=True)
     con = sqlite3.connect(db_path)
-    con.executescript(SCHEMA)
-    con.executemany("INSERT INTO tenants VALUES (?, ?)", TENANTS)
-    con.executemany("INSERT INTO users VALUES (?, ?, ?, ?, ?, ?)", USERS)
-    con.executemany("INSERT INTO gl_accounts VALUES (?, ?)", GL_ACCOUNTS)
+    for f in SQL_FILES:
+        con.executescript((SQL_DIR / f).read_text())
+    n_tenants = con.execute("SELECT COUNT(*) FROM tenants").fetchone()[0]
     for i, line in enumerate(jsonl.read_text().splitlines()):
         rec = json.loads(line)
         h, s = rec.get("header", {}), rec.get("summary", {})
         # ponytail: tenant = row parity; swap for a real seller->tenant mapping if needed.
-        tenant_id = i % len(TENANTS) + 1
+        tenant_id = i % n_tenants + 1
         date = parse_date(h.get("invoice_date"))
         cur = con.execute(
             "INSERT INTO invoices (tenant_id, invoice_no, direction, seller, client, seller_tax_id,"

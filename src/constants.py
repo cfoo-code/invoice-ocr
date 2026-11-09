@@ -17,6 +17,7 @@ SECTION_RE = re.compile(r"^\s*§\s*(\d+)\s+([^.\d][^.]*?)\s*$")
 SQL_FILES = ["schema.sql", "tenants.sql", "users.sql", "gl_accounts.sql"]
 
 # --- Tier-1 OCR (src/automate/ocr.py) ---
+OCR_CACHE_DIR = DATA_DIR / "ocr_cache"
 MIN_CONFIDENCE = 0.8
 CENT = 0.011
 

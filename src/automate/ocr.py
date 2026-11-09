@@ -1,12 +1,14 @@
 """Tier-1 document understanding: local RapidOCR + accounting checksum gate (Net + VAT == Gross)."""
 
+import hashlib
+import json
 from functools import cache
 from pathlib import Path
 
 from pydantic import BaseModel, model_validator
 from rapidocr_onnxruntime import RapidOCR
 
-from src.constants import CENT, MIN_CONFIDENCE, TOTALS_RE
+from src.constants import CENT, MIN_CONFIDENCE, OCR_CACHE_DIR, TOTALS_RE
 from src.db.db import parse_amount
 
 
@@ -34,10 +36,20 @@ def _engine() -> RapidOCR:
     return RapidOCR()
 
 
+def ocr_boxes(image: Path | str) -> list:
+    """RapidOCR boxes [corner_points, text, confidence], cached as JSON keyed by image sha256."""
+    cache = OCR_CACHE_DIR / f"{hashlib.sha256(Path(image).read_bytes()).hexdigest()}.json"
+    if cache.exists():
+        return json.loads(cache.read_text(encoding="utf-8"))["boxes"]
+    boxes = _engine()(str(image))[0] or []
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps({"image": str(image), "boxes": boxes}, default=float), "utf-8")
+    return boxes
+
+
 def ocr_text(image: Path | str) -> tuple[str, float]:
     """(text lines joined by newline, mean box confidence). No text detected -> ValueError."""
-    # One box per detected text region: [corner_points, text, confidence]; None if no text.
-    boxes = _engine()(str(image))[0]
+    boxes = ocr_boxes(image)
     if not boxes:
         raise ValueError(f"OCR found no text in {image}")
     text = "\n".join(text for _, text, _ in boxes)

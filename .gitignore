@@ -19,12 +19,11 @@ htmlcov/
 *.db
 *.db-journal
 *.db-wal
-data/invoices/*.png
-data/invoices/*.jpg
+
+# Generated data: downloads, ledger, OCR cache
+data/
 
 # Environment variables
 .env
 .env.*
 !.env.example
-data/invoices.jsonl
-data/*.md

@@ -2,6 +2,7 @@ import pytest
 from PIL import Image, ImageDraw, ImageFont
 from pydantic import ValidationError
 
+from src.automate import ocr
 from src.automate.ocr import OcrTotals, extract_totals, parse_totals
 
 
@@ -40,3 +41,18 @@ def test_extract_totals_from_rendered_image(tmp_path):
     im.save(img)
     t = extract_totals(img)
     assert (t.total_net, t.total_vat, t.total_gross) == (100.0, 10.0, 110.0)
+
+
+def test_ocr_result_cached_as_json(tmp_path, monkeypatch):
+    monkeypatch.setattr(ocr, "OCR_CACHE_DIR", tmp_path / "cache")
+    img = tmp_path / "inv.png"
+    im = Image.new("RGB", (400, 80), "white")
+    ImageDraw.Draw(im).text(
+        (10, 20), "Total 5,00", fill="black", font=ImageFont.load_default(size=28)
+    )
+    im.save(img)
+    first = ocr.ocr_text(img)
+    [cached] = (tmp_path / "cache").glob("*.json")
+    monkeypatch.setattr(ocr, "_engine", lambda: pytest.fail("cache miss"))
+    assert ocr.ocr_text(img) == first
+    assert "Total" in cached.read_text(encoding="utf-8")

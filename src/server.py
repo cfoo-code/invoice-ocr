@@ -1,4 +1,4 @@
-"""FastAPI service. Run: uvicorn src.api:app"""
+"""FastAPI service. Run: uvicorn src.server:app"""
 
 import asyncio
 import tempfile

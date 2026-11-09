@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw, ImageFont
 
-from src.api import app
+from src.server import app
 
 client = TestClient(app)
 

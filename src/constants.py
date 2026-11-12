@@ -1,6 +1,5 @@
 """Shared constants and regex rules."""
 
-import os
 import re
 from pathlib import Path
 
@@ -23,7 +22,7 @@ MIN_CONFIDENCE = 0.8
 CENT = 0.011
 
 # --- Tier-2 Vision LLM fallback (src/automate/ocr.py) ---
-VISION_MODEL = os.getenv("VISION_MODEL", "openai:gpt-4o-mini")
+VISION_MODEL = "openai:gpt-4o-mini"  # placeholder; swap for the chosen vision model id
 
 # One money amount, captured without the "$": optional "$ ", then digits (spaces allowed as
 # thousands separators), then "," or "." and exactly 2 decimals. e.g. "$ 1 234,56" -> "1 234,56".

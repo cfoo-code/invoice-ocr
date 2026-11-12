@@ -4,7 +4,7 @@ Reference GenAI architecture for B2B finance and payroll (Finago Ask, Automate, 
 
 ## Finago Automate: invoice totals from an image
 
-Automate reads the totals row of an invoice image (net, VAT, gross) and only accepts the result if the numbers add up. Tier 1 is local and free: RapidOCR on CPU, plus an accounting checksum. Anything Tier 1 can't vouch for is escalated to Tier 2: a Vision LLM (`VISION_MODEL`, default `openai:gpt-4o-mini`, needs `OPENAI_API_KEY`) whose answer must pass the same checksum (no confidence gate; LLMs have no calibrated score). A failed checksum is fed back to the LLM to retry.
+Automate reads the totals row of an invoice image (net, VAT, gross) and only accepts the result if the numbers add up. Tier 1 is local and free: RapidOCR on CPU, plus an accounting checksum. Anything Tier 1 can't vouch for is escalated to Tier 2: a Vision LLM (`VISION_MODEL` in `src/constants.py`, needs `OPENAI_API_KEY`) whose answer must pass the same checksum (no confidence gate; LLMs have no calibrated score). A failed checksum is fed back to the LLM to retry.
 
 ```mermaid
 flowchart LR

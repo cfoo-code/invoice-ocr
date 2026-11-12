@@ -12,6 +12,12 @@ from src.constants import CENT, MIN_CONFIDENCE, OCR_CACHE_DIR, TOTALS_RE
 from src.db.db import parse_amount
 
 
+def checksum(net: float, vat: float, gross: float) -> None:
+    """Accounting identity Net + VAT == Gross (±1 cent). Shared by Tier 1 and Tier 2."""
+    if abs(net + vat - gross) > CENT:
+        raise ValueError(f"checksum failed: {net} + {vat} != {gross}")
+
+
 class OcrTotals(BaseModel):
     """Raises ValidationError when the checksum or confidence gate fails -> escalate to Tier 2."""
 
@@ -21,11 +27,12 @@ class OcrTotals(BaseModel):
     confidence: float
 
     @model_validator(mode="after")
-    def checksum(self):
-        if abs(self.total_net + self.total_vat - self.total_gross) > CENT:
-            raise ValueError(
-                f"checksum failed: {self.total_net} + {self.total_vat} != {self.total_gross}"
-            )
+    def check_checksum(self):
+        checksum(self.total_net, self.total_vat, self.total_gross)
+        return self
+
+    @model_validator(mode="after")
+    def check_confidence(self):
         if self.confidence < MIN_CONFIDENCE:
             raise ValueError(f"OCR confidence {self.confidence:.2f} < {MIN_CONFIDENCE}")
         return self

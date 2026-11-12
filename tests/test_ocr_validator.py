@@ -18,6 +18,9 @@ def test_checksum_and_confidence_gate():
         OcrTotals(total_net=100, total_vat=10, total_gross=111, confidence=0.9)
     with pytest.raises(ValidationError, match="confidence"):
         OcrTotals(total_net=100, total_vat=10, total_gross=110, confidence=0.5)
+    ocr.checksum(100, 10, 110)
+    with pytest.raises(ValueError, match="checksum"):
+        ocr.checksum(100, 10, 999)
     with pytest.raises(ValueError, match="no totals"):
         parse_totals("illegible", confidence=0.9)
 

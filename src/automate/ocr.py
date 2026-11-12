@@ -1,14 +1,18 @@
-"""Tier-1 document understanding: local RapidOCR + accounting checksum gate (Net + VAT == Gross)."""
+"""Invoice totals: Tier 1 local RapidOCR, Tier 2 Vision LLM fallback; both gated by Net+VAT==Gross."""
 
 import hashlib
+import io
 import json
 from functools import cache
 from pathlib import Path
 
+from PIL import Image
 from pydantic import BaseModel, model_validator
+from pydantic_ai import Agent, BinaryContent
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from rapidocr_onnxruntime import RapidOCR
 
-from src.constants import CENT, MIN_CONFIDENCE, OCR_CACHE_DIR, TOTALS_RE
+from src.constants import CENT, MIN_CONFIDENCE, OCR_CACHE_DIR, TOTALS_RE, VISION_MODEL
 from src.db.db import parse_amount
 
 
@@ -76,3 +80,43 @@ def parse_totals(text: str, confidence: float) -> OcrTotals:
 def extract_totals(image: Path | str) -> OcrTotals:
     text, mean_confidence = ocr_text(image)
     return parse_totals(text, mean_confidence)
+
+
+class VisionTotals(BaseModel):
+    """Tier-2 output. Checksum only: an LLM has no calibrated confidence to gate on."""
+
+    total_net: float
+    total_vat: float
+    total_gross: float
+
+    @model_validator(mode="after")
+    def check_checksum(self):
+        checksum(self.total_net, self.total_vat, self.total_gross)
+        return self
+
+
+@cache
+def vision_agent() -> Agent[None, VisionTotals]:
+    return Agent(
+        VISION_MODEL,
+        output_type=VisionTotals,
+        instructions="Read the invoice summary 'Total' row: net amount, VAT, gross amount.",
+        defer_model_check=True,
+    )
+
+
+def extract_totals_vision(image: Path | str) -> VisionTotals:
+    """Tier 2. Checksum failure is fed back to the LLM to retry; still failing -> ValueError."""
+    data = Path(image).read_bytes()
+    media_type = Image.MIME[Image.open(io.BytesIO(data)).format]
+    try:
+        return vision_agent().run_sync([BinaryContent(data, media_type=media_type)]).output
+    except UnexpectedModelBehavior as e:
+        raise ValueError(f"Tier 2 failed: {e}") from e
+
+
+def extract_totals_with_fallback(image: Path | str) -> OcrTotals | VisionTotals:
+    try:
+        return extract_totals(image)
+    except ValueError:
+        return extract_totals_vision(image)

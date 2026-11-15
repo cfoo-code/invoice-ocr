@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    # Langfuse auth check fails at startup until langfuse-web is up; retry.
+    restart: on-failure
     ports:
       - "8000:8000"
     environment:

@@ -2,13 +2,9 @@
 
 from pathlib import Path
 
-from opentelemetry import trace
-
 from src.automate import Totals, llm_ocr, rapidocr
 from src.automate.rapidocr import OcrTotals
 from src.constants import CENT, MIN_CONFIDENCE
-
-tracer = trace.get_tracer(__name__)
 
 
 def checksum(t: Totals) -> None:
@@ -25,15 +21,11 @@ def tier1_gate(t: OcrTotals) -> None:
 
 
 def extract_totals_with_fallback(image: Path | str) -> OcrTotals | Totals:
-    with tracer.start_as_current_span("ocr_pipeline") as span:
-        try:
-            with tracer.start_as_current_span("tier1_rapidocr"):
-                t = rapidocr.extract_totals(image)
-                tier1_gate(t)
-            span.set_attribute("ocr.tier", 1)
-            return t
-        except ValueError:
-            span.set_attribute("ocr.tier", 2)
-            t = llm_ocr.extract_totals_vision(image)
-            checksum(t)
-            return t
+    try:
+        t = rapidocr.extract_totals(image)
+        tier1_gate(t)
+        return t
+    except ValueError:
+        t = llm_ocr.extract_totals_vision(image)
+        checksum(t)
+        return t

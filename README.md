@@ -92,7 +92,7 @@ OCR runs in a worker thread, so one slow image doesn't block other requests. Int
 
 ## Observability (Langfuse, self-hosted)
 
-Each `/automate/ocr` request is one trace: an `ocr_pipeline` span (attribute `ocr.tier` = 1 or 2), a `tier1_rapidocr` child, and on escalation the Pydantic AI LLM spans with tokens and cost. Tracing is off unless `LANGFUSE_PUBLIC_KEY` is set.
+`Agent.instrument_all()` traces every Tier 2 Vision LLM call (prompt, image, output, tokens, cost). Tier 1 is local and isn't traced. Tracing is off unless `LANGFUSE_PUBLIC_KEY` is set; with it set, startup fails if the Langfuse auth check fails.
 
 `docker-compose.langfuse.yml` is the unmodified [official Langfuse compose file](https://github.com/langfuse/langfuse/blob/main/docker-compose.yml); its `# CHANGEME` defaults are for local use only. Put this in `.env` (Langfuse creates the project and keys on first start):
 

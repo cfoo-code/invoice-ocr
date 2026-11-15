@@ -1,14 +1,35 @@
 """FastAPI service. Run: uvicorn src.server:app"""
 
 import asyncio
+import os
 import tempfile
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from langfuse import Langfuse
+from langfuse.span_filter import is_default_export_span
+from pydantic_ai import Agent
 
 from src.automate import Totals
 from src.automate.pipeline import extract_totals_with_fallback
 from src.automate.rapidocr import OcrTotals
+
+
+def init_langfuse(**kwargs) -> Langfuse:
+    """Export pipeline spans (tracers named src.*) and Pydantic AI LLM spans to Langfuse."""
+    client = Langfuse(
+        should_export_span=lambda s: (
+            is_default_export_span(s) or s.instrumentation_scope.name.startswith("src.")
+        ),
+        **kwargs,
+    )
+    Agent.instrument_all()
+    return client
+
+
+# No key -> spans stay in the no-op OTel provider: nothing exported, nothing logged.
+if os.getenv("LANGFUSE_PUBLIC_KEY"):
+    init_langfuse()
 
 app = FastAPI(title="Finago AI Copilot")
 MAX_IMAGE_BYTES = 10 * 1024 * 1024

@@ -90,6 +90,29 @@ sequenceDiagram
 
 OCR runs in a worker thread, so one slow image doesn't block other requests. Interactive docs are at `/docs`.
 
+## Observability (Langfuse, self-hosted)
+
+Each `/automate/ocr` request is one trace: an `ocr_pipeline` span (attribute `ocr.tier` = 1 or 2), a `tier1_rapidocr` child, and on escalation the Pydantic AI LLM spans with tokens and cost. Tracing is off unless `LANGFUSE_PUBLIC_KEY` is set.
+
+`docker-compose.langfuse.yml` is the unmodified [official Langfuse compose file](https://github.com/langfuse/langfuse/blob/main/docker-compose.yml); its `# CHANGEME` defaults are for local use only. Put this in `.env` (Langfuse creates the project and keys on first start):
+
+```bash
+LANGFUSE_INIT_ORG_ID=finago
+LANGFUSE_INIT_PROJECT_ID=finago-ai-copilot
+LANGFUSE_INIT_PROJECT_PUBLIC_KEY=pk-lf-local
+LANGFUSE_INIT_PROJECT_SECRET_KEY=sk-lf-local
+LANGFUSE_INIT_USER_EMAIL=admin@example.com
+LANGFUSE_INIT_USER_PASSWORD=change-me-please
+LANGFUSE_PUBLIC_KEY=pk-lf-local
+LANGFUSE_SECRET_KEY=sk-lf-local
+```
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.langfuse.yml up
+```
+
+Traces appear at <http://localhost:3000>. Running the API outside Docker, also set `LANGFUSE_BASE_URL=http://localhost:3000`.
+
 ## Development
 
 ```bash

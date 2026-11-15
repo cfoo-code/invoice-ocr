@@ -3,9 +3,8 @@
 import sqlite3
 import sys
 
-from pydantic import ValidationError
-
-from src.automate.ocr import ocr_text, parse_totals
+from src.automate.pipeline import tier1_gate
+from src.automate.rapidocr import ocr_text, parse_totals
 from src.constants import CENT
 from src.db.db import get_paths
 
@@ -25,13 +24,15 @@ for img, *truth in rows:
     try:
         text, conf = ocr_text(img)
         o = parse_totals(text, conf)
-        got = [o.total_net, o.total_vat, o.total_gross]
-        result = "exact" if all(abs(a - b) <= CENT for a, b in zip(got, truth)) else "wrong"
-    except ValidationError as e:
-        got, result = "-", "gate_failed"
-        detail = e.errors()[0]["msg"]
     except ValueError:
         got, result = "-", "no_totals"
+    else:
+        try:
+            tier1_gate(o)
+            got = [o.total_net, o.total_vat, o.total_gross]
+            result = "exact" if all(abs(a - b) <= CENT for a, b in zip(got, truth)) else "wrong"
+        except ValueError as e:
+            got, result, detail = "-", "gate_failed", str(e)
     stats[result] += 1
     line = f"{img.split(chr(92))[-1].split('/')[-1]:<26}{truth!s:<32}{got!s:<32}{result}"
     print(line + (f" ({detail})" if result == "gate_failed" else ""))

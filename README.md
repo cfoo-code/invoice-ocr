@@ -4,7 +4,7 @@ Reference GenAI architecture for B2B finance and payroll (Finago Ask, Automate, 
 
 ## Finago Automate: invoice totals from an image
 
-Automate reads the totals row of an invoice image (net, VAT, gross) and only accepts the result if the numbers add up. Tier 1 is local and free: RapidOCR on CPU, plus an accounting checksum. Anything Tier 1 can't vouch for is rejected so it can be escalated to Tier 2 (Vision LLM, planned).
+Automate reads the totals row of an invoice image (net, VAT, gross) and only accepts the result if the numbers add up. Tier 1 is local and free: RapidOCR on CPU, plus an accounting checksum. Anything Tier 1 can't vouch for is escalated to Tier 2: a Vision LLM (`VISION_MODEL` in `src/constants.py`, needs `OPENAI_API_KEY`) whose answer must pass the same checksum (no confidence gate; LLMs have no calibrated score). Tier 2 gets one attempt.
 
 ```mermaid
 flowchart LR
@@ -18,14 +18,14 @@ flowchart LR
     G -- no --> I[Reject -> Tier 2 ⏭]
 ```
 
-All of it lives in `src/automate/ocr.py`:
+Code in `src/automate/`: `rapidocr.py` (Tier 1, below), `llm_ocr.py` (Tier 2), `pipeline.py` (all gates plus `extract_totals_with_fallback`, used by the API), and the shared `Totals` model in `__init__.py`. Tier 1 steps:
 
 | Step | Function | Notes |
 | --- | --- | --- |
 | OCR + cache | `ocr_boxes(image)` | Keyed by SHA-256 of the image bytes, so renamed copies still hit. Hit about 10 ms, miss about 9-13 s. |
 | Text + confidence | `ocr_text(image)` | Raises `ValueError` if no text is found. |
 | Parse totals | `parse_totals(text, conf)` | The last `Total` row wins, because the summary sits at the bottom. |
-| Validate | `OcrTotals` (pydantic) | Checksum and confidence gate; failure raises `ValidationError`. |
+| Validate | `pipeline.tier1_gate(totals)` | Checksum and confidence gate; failure raises `ValueError`. |
 | All in one | `extract_totals(image)` | What callers use. |
 
 Thresholds (`MIN_CONFIDENCE`, `CENT`) and the totals regex are in `src/constants.py`.
@@ -86,7 +86,7 @@ sequenceDiagram
 | 200 | Totals pass the checksum and confidence gate | `{"total_net": 100.0, "total_vat": 10.0, "total_gross": 110.0, "confidence": 0.98}` |
 | 400 | Empty body | `{"detail": "empty body; POST the image bytes"}` |
 | 413 | Image larger than 10 MB | `{"detail": "image larger than ... bytes"}` |
-| 422 | No text, no totals row, checksum failed or confidence too low (escalate to Tier 2) | `{"detail": "...checksum failed: 100.0 + 10.0 != 999.0..."}` |
+| 422 | Tier 1 failed and Tier 2 failed the checksum (unusable LLM output or API errors -> 500) | `{"detail": "checksum failed: 100.0 + 10.0 != 999.0"}` |
 
 OCR runs in a worker thread, so one slow image doesn't block other requests. Interactive docs are at `/docs`.
 

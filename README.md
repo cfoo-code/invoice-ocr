@@ -90,6 +90,20 @@ sequenceDiagram
 
 OCR runs in a worker thread, so one slow image doesn't block other requests. Interactive docs are at `/docs`.
 
+## Observability (Langfuse Cloud)
+
+Each request is one trace from `@observe` on `extract_totals_with_fallback` (input image path, output totals). On escalation, `Agent.instrument_all()` nests the Tier 2 Vision LLM call under it (prompt, image, output, tokens, cost).
+
+Create a project at [cloud.langfuse.com](https://cloud.langfuse.com) and put its keys in `.env`:
+
+```bash
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_BASE_URL=https://cloud.langfuse.com  # US region: https://us.cloud.langfuse.com
+```
+
+Without `LANGFUSE_PUBLIC_KEY`, tracing is off and Langfuse logs an auth warning on every request. With it set, startup fails if the Langfuse auth check fails.
+
 ## Development
 
 ```bash

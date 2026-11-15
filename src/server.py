@@ -1,16 +1,30 @@
 """FastAPI service. Run: uvicorn src.server:app"""
 
 import asyncio
+import os
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from langfuse import get_client
+from pydantic_ai import Agent
 
 from src.automate import Totals
 from src.automate.pipeline import extract_totals_with_fallback
 from src.automate.rapidocr import OcrTotals
 
-app = FastAPI(title="Finago AI Copilot")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if os.getenv("LANGFUSE_PUBLIC_KEY"):
+        if not get_client().auth_check():
+            raise RuntimeError("Langfuse auth check failed - verify credentials")
+        Agent.instrument_all()
+    yield
+
+
+app = FastAPI(title="Finago AI Copilot", lifespan=lifespan)
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 

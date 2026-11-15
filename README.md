@@ -86,7 +86,7 @@ sequenceDiagram
 | 200 | Totals pass the checksum and confidence gate | `{"total_net": 100.0, "total_vat": 10.0, "total_gross": 110.0, "confidence": 0.98}` |
 | 400 | Empty body | `{"detail": "empty body; POST the image bytes"}` |
 | 413 | Image larger than 10 MB | `{"detail": "image larger than ... bytes"}` |
-| 422 | Tier 1 failed and Tier 2 failed the checksum (or returned unusable output) | `{"detail": "checksum failed: 100.0 + 10.0 != 999.0"}` |
+| 422 | Tier 1 failed and Tier 2 failed the checksum (unusable LLM output or API errors -> 500) | `{"detail": "checksum failed: 100.0 + 10.0 != 999.0"}` |
 
 OCR runs in a worker thread, so one slow image doesn't block other requests. Interactive docs are at `/docs`.
 

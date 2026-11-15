@@ -6,7 +6,6 @@ from pathlib import Path
 
 from PIL import Image
 from pydantic_ai import Agent, BinaryContent
-from pydantic_ai.exceptions import UnexpectedModelBehavior
 
 from src.automate import Totals
 from src.constants import VISION_MODEL
@@ -23,10 +22,7 @@ def vision_agent() -> Agent[None, Totals]:
 
 
 def extract_totals_vision(image: Path | str) -> Totals:
-    """Single attempt; the checksum is applied by pipeline.py. Bad LLM output -> ValueError."""
+    """Single attempt; the checksum is applied by pipeline.py."""
     data = Path(image).read_bytes()
     media_type = Image.MIME[Image.open(io.BytesIO(data)).format]
-    try:
-        return vision_agent().run_sync([BinaryContent(data, media_type=media_type)]).output
-    except UnexpectedModelBehavior as e:
-        raise ValueError(f"Tier 2 failed: {e}") from e
+    return vision_agent().run_sync([BinaryContent(data, media_type=media_type)]).output

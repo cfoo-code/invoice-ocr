@@ -5,7 +5,7 @@ import sys
 
 from pydantic import ValidationError
 
-from src.automate.ocr import ocr_text, parse_totals
+from src.automate.rapidocr import ocr_text, parse_totals
 from src.constants import CENT
 from src.db.db import get_paths
 

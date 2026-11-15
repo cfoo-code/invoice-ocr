@@ -6,7 +6,9 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 
-from src.automate.ocr import OcrTotals, VisionTotals, extract_totals_with_fallback
+from src.automate.llm_ocr import VisionTotals
+from src.automate.pipeline import extract_totals_with_fallback
+from src.automate.rapidocr import OcrTotals
 
 app = FastAPI(title="Finago AI Copilot")
 MAX_IMAGE_BYTES = 10 * 1024 * 1024

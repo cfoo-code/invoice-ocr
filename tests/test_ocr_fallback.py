@@ -3,12 +3,10 @@ from PIL import Image
 from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
-from src.automate.ocr import (
-    OcrTotals,
-    VisionTotals,
-    extract_totals_with_fallback,
-    vision_agent,
-)
+from src.automate import llm_ocr, rapidocr
+from src.automate.llm_ocr import VisionTotals, vision_agent
+from src.automate.pipeline import extract_totals_with_fallback
+from src.automate.rapidocr import OcrTotals
 
 
 def fake_llm(*replies):
@@ -50,12 +48,10 @@ def test_vision_still_failing_raises_value_error(blank):
 
 
 def test_tier1_success_skips_vision(monkeypatch):
-    from src.automate import ocr
-
     monkeypatch.setattr(
-        ocr,
+        rapidocr,
         "extract_totals",
         lambda _: OcrTotals(total_net=1, total_vat=1, total_gross=2, confidence=0.9),
     )
-    monkeypatch.setattr(ocr, "extract_totals_vision", lambda _: pytest.fail("Tier 2 called"))
-    assert isinstance(ocr.extract_totals_with_fallback("x"), OcrTotals)
+    monkeypatch.setattr(llm_ocr, "extract_totals_vision", lambda _: pytest.fail("Tier 2 called"))
+    assert isinstance(extract_totals_with_fallback("x"), OcrTotals)

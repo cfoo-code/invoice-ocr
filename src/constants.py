@@ -16,12 +16,12 @@ SECTION_RE = re.compile(r"^\s*§\s*(\d+)\s+([^.\d][^.]*?)\s*$")
 # Order matters: schema first, then seed tables respecting foreign keys.
 SQL_FILES = ["schema.sql", "tenants.sql", "users.sql", "gl_accounts.sql"]
 
-# --- Tier-1 OCR (src/automate/ocr.py) ---
+# --- Tier-1 OCR (src/automate/rapidocr.py) ---
 OCR_CACHE_DIR = DATA_DIR / "ocr_cache"
 MIN_CONFIDENCE = 0.8
 CENT = 0.011
 
-# --- Tier-2 Vision LLM fallback (src/automate/ocr.py) ---
+# --- Tier-2 Vision LLM fallback (src/automate/llm_ocr.py) ---
 VISION_MODEL = "openai:gpt-4o-mini"  # placeholder; swap for the chosen vision model id
 
 # One money amount, captured without the "$": optional "$ ", then digits (spaces allowed as

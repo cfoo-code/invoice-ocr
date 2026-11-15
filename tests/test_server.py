@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw, ImageFont
 
-from src.automate.ocr import vision_agent
+from src.automate.llm_ocr import vision_agent
 from src.server import app
 from tests.test_ocr_fallback import fake_llm
 

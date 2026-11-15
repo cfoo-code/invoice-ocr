@@ -18,7 +18,7 @@ flowchart LR
     G -- no --> I[Reject -> Tier 2 ⏭]
 ```
 
-All of it lives in `src/automate/ocr.py`:
+Code in `src/automate/`: `rapidocr.py` (Tier 1, below), `llm_ocr.py` (Tier 2), `pipeline.py` (`extract_totals_with_fallback`, used by the API), and the shared `checksum()` in `__init__.py`. Tier 1 steps:
 
 | Step | Function | Notes |
 | --- | --- | --- |

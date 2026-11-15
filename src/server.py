@@ -1,7 +1,6 @@
 """FastAPI service. Run: uvicorn src.server:app"""
 
 import asyncio
-import os
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,10 +16,9 @@ from src.automate.rapidocr import OcrTotals
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    if os.getenv("LANGFUSE_PUBLIC_KEY"):
-        if not get_client().auth_check():
-            raise RuntimeError("Langfuse auth check failed - verify credentials")
-        Agent.instrument_all()
+    if not get_client().auth_check():
+        raise RuntimeError("Langfuse auth check failed - verify LANGFUSE_* credentials")
+    Agent.instrument_all()
     yield
 
 

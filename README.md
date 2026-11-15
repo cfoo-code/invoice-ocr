@@ -102,7 +102,7 @@ LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_BASE_URL=https://cloud.langfuse.com  # US region: https://us.cloud.langfuse.com
 ```
 
-Without `LANGFUSE_PUBLIC_KEY`, tracing is off and Langfuse logs an auth warning on every request. With it set, startup fails if the Langfuse auth check fails.
+The keys are required: the API refuses to start if the Langfuse auth check fails (missing key, wrong secret, wrong region). Tests don't start the app lifespan, so they run without keys.
 
 ## Development
 

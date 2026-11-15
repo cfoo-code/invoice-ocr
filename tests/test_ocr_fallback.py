@@ -4,7 +4,7 @@ from pydantic_ai.messages import ModelResponse, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 
 from src.automate import llm_ocr, rapidocr
-from src.automate.llm_ocr import VisionTotals, vision_agent
+from src.automate.llm_ocr import vision_agent
 from src.automate.pipeline import extract_totals_with_fallback
 from src.automate.rapidocr import OcrTotals
 
@@ -31,18 +31,13 @@ def blank(tmp_path):
 def test_tier1_failure_escalates_to_vision(blank):
     with vision_agent().override(model=fake_llm((100, 10, 110))):
         t = extract_totals_with_fallback(blank)
-    assert isinstance(t, VisionTotals) and t.total_gross == 110
+    assert not isinstance(t, OcrTotals) and t.total_gross == 110
 
 
-def test_vision_retries_after_checksum_failure(blank):
-    with vision_agent().override(model=fake_llm((100, 10, 999), (100, 10, 110))):
-        assert extract_totals_with_fallback(blank).total_gross == 110
-
-
-def test_vision_still_failing_raises_value_error(blank):
+def test_vision_checksum_failure_raises_without_retry(blank):
     with (
-        vision_agent().override(model=fake_llm(*[(100, 10, 999)] * 5)),
-        pytest.raises(ValueError, match="Tier 2"),
+        vision_agent().override(model=fake_llm((100, 10, 999), (100, 10, 110))),
+        pytest.raises(ValueError, match="checksum"),
     ):
         extract_totals_with_fallback(blank)
 

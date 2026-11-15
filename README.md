@@ -4,7 +4,7 @@ Reference GenAI architecture for B2B finance and payroll (Finago Ask, Automate, 
 
 ## Finago Automate: invoice totals from an image
 
-Automate reads the totals row of an invoice image (net, VAT, gross) and only accepts the result if the numbers add up. Tier 1 is local and free: RapidOCR on CPU, plus an accounting checksum. Anything Tier 1 can't vouch for is escalated to Tier 2: a Vision LLM (`VISION_MODEL` in `src/constants.py`, needs `OPENAI_API_KEY`) whose answer must pass the same checksum (no confidence gate; LLMs have no calibrated score). A failed checksum is fed back to the LLM to retry.
+Automate reads the totals row of an invoice image (net, VAT, gross) and only accepts the result if the numbers add up. Tier 1 is local and free: RapidOCR on CPU, plus an accounting checksum. Anything Tier 1 can't vouch for is escalated to Tier 2: a Vision LLM (`VISION_MODEL` in `src/constants.py`, needs `OPENAI_API_KEY`) whose answer must pass the same checksum (no confidence gate; LLMs have no calibrated score). Tier 2 gets one attempt.
 
 ```mermaid
 flowchart LR
@@ -18,14 +18,14 @@ flowchart LR
     G -- no --> I[Reject -> Tier 2 ⏭]
 ```
 
-Code in `src/automate/`: `rapidocr.py` (Tier 1, below), `llm_ocr.py` (Tier 2), `pipeline.py` (`extract_totals_with_fallback`, used by the API), and the shared `checksum()` in `__init__.py`. Tier 1 steps:
+Code in `src/automate/`: `rapidocr.py` (Tier 1, below), `llm_ocr.py` (Tier 2), `pipeline.py` (all gates plus `extract_totals_with_fallback`, used by the API), and the shared `Totals` model in `__init__.py`. Tier 1 steps:
 
 | Step | Function | Notes |
 | --- | --- | --- |
 | OCR + cache | `ocr_boxes(image)` | Keyed by SHA-256 of the image bytes, so renamed copies still hit. Hit about 10 ms, miss about 9-13 s. |
 | Text + confidence | `ocr_text(image)` | Raises `ValueError` if no text is found. |
 | Parse totals | `parse_totals(text, conf)` | The last `Total` row wins, because the summary sits at the bottom. |
-| Validate | `OcrTotals` (pydantic) | Checksum and confidence gate; failure raises `ValidationError`. |
+| Validate | `pipeline.tier1_gate(totals)` | Checksum and confidence gate; failure raises `ValueError`. |
 | All in one | `extract_totals(image)` | What callers use. |
 
 Thresholds (`MIN_CONFIDENCE`, `CENT`) and the totals regex are in `src/constants.py`.

@@ -1,36 +1,19 @@
-"""Tier 1: local RapidOCR + checksum and confidence gates."""
+"""Tier 1: local RapidOCR reads the totals row."""
 
 import hashlib
 import json
 from functools import cache
 from pathlib import Path
 
-from pydantic import BaseModel, model_validator
 from rapidocr_onnxruntime import RapidOCR
 
-from src.automate import checksum
-from src.constants import MIN_CONFIDENCE, OCR_CACHE_DIR, TOTALS_RE
+from src.automate import Totals
+from src.constants import OCR_CACHE_DIR, TOTALS_RE
 from src.db.db import parse_amount
 
 
-class OcrTotals(BaseModel):
-    """Raises ValidationError when the checksum or confidence gate fails -> escalate to Tier 2."""
-
-    total_net: float
-    total_vat: float
-    total_gross: float
+class OcrTotals(Totals):
     confidence: float
-
-    @model_validator(mode="after")
-    def check_checksum(self):
-        checksum(self.total_net, self.total_vat, self.total_gross)
-        return self
-
-    @model_validator(mode="after")
-    def check_confidence(self):
-        if self.confidence < MIN_CONFIDENCE:
-            raise ValueError(f"OCR confidence {self.confidence:.2f} < {MIN_CONFIDENCE}")
-        return self
 
 
 @cache

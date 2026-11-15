@@ -1,7 +1,9 @@
-from src.constants import CENT
+from pydantic import BaseModel
 
 
-def checksum(net: float, vat: float, gross: float) -> None:
-    """Accounting identity Net + VAT == Gross (±1 cent). Shared by Tier 1 and Tier 2."""
-    if abs(net + vat - gross) > CENT:
-        raise ValueError(f"checksum failed: {net} + {vat} != {gross}")
+class Totals(BaseModel):
+    """Invoice summary row as read by either tier. Unvalidated: gates live in pipeline.py."""
+
+    total_net: float
+    total_vat: float
+    total_gross: float

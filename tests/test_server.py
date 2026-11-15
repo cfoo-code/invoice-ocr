@@ -22,8 +22,8 @@ def test_ocr_endpoint(tmp_path):
     assert (r.json()["total_net"], r.json()["total_gross"]) == (100.0, 110.0)
 
     bad = _png(tmp_path, "Total  $ 100,00  $ 10,00  $ 999,00")
-    with vision_agent().override(model=fake_llm(*[(100, 10, 999)] * 5)):
+    with vision_agent().override(model=fake_llm((100, 10, 999))):
         r = client.post("/automate/ocr", content=bad)
-    assert r.status_code == 422 and "Tier 2" in r.json()["detail"]
+    assert r.status_code == 422 and "checksum" in r.json()["detail"]
 
     assert client.post("/automate/ocr", content=b"").status_code == 400

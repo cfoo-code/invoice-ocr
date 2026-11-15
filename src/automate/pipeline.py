@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+from langfuse import observe
+
 from src.automate import Totals, llm_ocr, rapidocr
 from src.automate.rapidocr import OcrTotals
 from src.constants import CENT, MIN_CONFIDENCE
@@ -20,6 +22,7 @@ def tier1_gate(t: OcrTotals) -> None:
         raise ValueError(f"OCR confidence {t.confidence:.2f} < {MIN_CONFIDENCE}")
 
 
+@observe()
 def extract_totals_with_fallback(image: Path | str) -> OcrTotals | Totals:
     try:
         t = rapidocr.extract_totals(image)
